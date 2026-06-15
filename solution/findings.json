@@ -1,12 +1,54 @@
 {
-  "team": "TODO-team-name",
+  "team": "2A202600641",
   "schema_version": 1,
   "findings": [
     {
+      "fault_class": "cost_blowup",
+      "evidence": {"metric": "avg_total_tokens_per_request", "observed": "~50300 tokens/req (total 2.6M tokens, $2.71 over 60 reqs); single request pub-009 used 199178 tokens", "trace_ids": ["pub-009"]},
+      "root_cause": "verbose_system:true resends a bloated system prompt on every step, the reasoning model emits large completions, and uncapped tool calls + loops multiply the steps.",
+      "suggested_fix": "config: verbose_system:false, tool_budget:~4, loop_guard:true, lower max_completion_tokens; rewrite prompt.txt to be concise and call each tool once."
+    },
+    {
       "fault_class": "latency_spike",
-      "evidence": {"metric": "latency_p95_ms", "observed": "TODO from your telemetry", "trace_ids": []},
-      "root_cause": "TODO: what config knob or behavior causes it?",
-      "suggested_fix": "TODO: config change and/or wrapper mitigation"
+      "evidence": {"metric": "latency_ms_percentiles", "observed": "P50=17412, P95=37040, P99=40230, max=84315 ms", "trace_ids": ["pub-009"]},
+      "root_cause": "Long-tail latency is driven by looping requests that re-issue the same tool call repeatedly until max_steps, plus no caching of repeated questions.",
+      "suggested_fix": "config: loop_guard:true, cache.enabled:true, smaller context_size; wrapper: retry with backoff and cache repeats."
+    },
+    {
+      "fault_class": "infinite_loop",
+      "evidence": {"metric": "pct_requests_max_tool_repeat>=3_and_status_max_steps", "observed": "23.1% of requests loop (max_tool_repeat>=3), 17.3% hit max_steps and return no answer; pub-010 called check_stock(macbook) 11x", "trace_ids": ["pub-010", "pub-009"]},
+      "root_cause": "loop_guard:false with max_steps:12 lets the agent repeat identical tool calls; it loops hardest when a tool returns an unexpected result (e.g. forced out-of-stock).",
+      "suggested_fix": "config: loop_guard:true (and/or lower max_steps); prompt: do not repeat a tool that already returned a result."
+    },
+    {
+      "fault_class": "tool_overuse",
+      "evidence": {"metric": "pct_requests_with_redundant_tool_calls", "observed": "50.0% of requests over-call (n_tools>3 or a tool called >=2x); pub-039 called calc_shipping twice", "trace_ids": ["pub-039"]},
+      "root_cause": "tool_budget:0 (uncapped) and a system prompt that encourages calling tools 'to be safe' instead of each tool at most once.",
+      "suggested_fix": "config: tool_budget:~4; prompt: call check_stock, then get_discount (if coupon), then calc_shipping (if destination) each at most once."
+    },
+    {
+      "fault_class": "error_spike",
+      "evidence": {"metric": "transient_tool_error_rate", "observed": "42/219 tool calls returned observation.error=='upstream_unavailable' = 19.2% (matches tool_error_rate 0.18); 8/60 requests crashed to wrapper_error when the error went unretried", "trace_ids": ["pub-028"]},
+      "root_cause": "tool_error_rate:0.18 injects intermittent transient tool failures, and retry.enabled:false means a single failure aborts the request.",
+      "suggested_fix": "config: retry.enabled:true with max_attempts 2-3 and backoff_ms; wrapper: catch transient observation errors and retry call_next."
+    },
+    {
+      "fault_class": "tool_failure",
+      "evidence": {"metric": "wrong_tool_data_vs_reality", "observed": "check_stock(macbook) always returns in_stock:false (28.8% of requests); calc_shipping('Đà Nẵng') fails with destination_not_served while calc_shipping('da nang') succeeds (same city)", "trace_ids": ["pub-058", "pub-050", "pub-010"]},
+      "root_cause": "catalog_override forces macbook out-of-stock (data contradicts reality), and normalize_unicode:false makes the shipping tool reject diacritic/alternate destination spellings.",
+      "suggested_fix": "config: clear catalog_override and set normalize_unicode:true; wrapper: normalize/strip diacritics from the destination before the tool call."
+    },
+    {
+      "fault_class": "pii_leak",
+      "evidence": {"metric": "pct_answers_containing_email_or_phone", "observed": "25.0% of answers contained raw email/phone (telemetry.redact found PII in the answer text)", "trace_ids": []},
+      "root_cause": "redact_pii:false and the system prompt echoes the customer's email/phone back in the reply.",
+      "suggested_fix": "config: redact_pii:true; prompt: never repeat the customer's email or phone; wrapper: redact PII from the final answer as a backstop."
+    },
+    {
+      "fault_class": "quality_drift",
+      "evidence": {"metric": "degradation_across_turn_index", "observed": "no_answer rises to 17-23% and loop rate to 25-31% on turns 0-2 vs 7-14% on turn 3; avg tokens climb to ~60k mid-session", "trace_ids": []},
+      "root_cause": "session_drift_rate:0.06 with context_reset_every:0 (context never resets) lets quality degrade as a session accumulates state.",
+      "suggested_fix": "config: context_reset_every>0 to reset session context, self_consistency:2-3 to steady noisy outputs; wrapper: reset drifting sessions."
     }
   ]
 }
