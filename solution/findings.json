@@ -45,6 +45,12 @@
       "suggested_fix": "config: redact_pii:true; prompt: never repeat the customer's email or phone; wrapper: redact PII from the final answer as a backstop."
     },
     {
+      "fault_class": "arithmetic_error",
+      "evidence": {"metric": "stated_total_vs_recomputed_from_tool_data", "observed": "model writes correct steps but a wrong final sum: pub-098 '30600000 + 42500 = 31025000' (should be 30642500); 4 of 6 orders in a batch had the stated total != recomputed total", "trace_ids": ["pub-098", "pub-113", "pub-003", "pub-005"]},
+      "root_cause": "temperature 1.6 makes the model's arithmetic inconsistent; it estimates the final addition instead of computing it exactly.",
+      "suggested_fix": "config: temperature 0.2 (optionally self_consistency/verify); prompt: exact floor formula subtotal*(100-pct)//100 + shipping; wrapper: recompute the total deterministically from tool data and correct the answer."
+    },
+    {
       "fault_class": "quality_drift",
       "evidence": {"metric": "degradation_across_turn_index", "observed": "no_answer rises to 17-23% and loop rate to 25-31% on turns 0-2 vs 7-14% on turn 3; avg tokens climb to ~60k mid-session", "trace_ids": []},
       "root_cause": "session_drift_rate:0.06 with context_reset_every:0 (context never resets) lets quality degrade as a session accumulates state.",
