@@ -1,6 +1,6 @@
 {
-  "provider": "local",
-  "model": "qwen2.5:7b",
+  "provider": "openai",
+  "model": "claude-haiku-4-5",
   "model_price_tier": "premium",
   "max_steps": 8,
   "loop_guard": true,
@@ -9,7 +9,7 @@
   "verbose_system": false,
   "timeout_ms": 0,
   "max_completion_tokens": 2000,
-  "retry": {"enabled": true, "max_attempts": 3, "backoff_ms": 400},
+  "retry": {"enabled": true, "max_attempts": 6, "backoff_ms": 6000},
   "cache": {"enabled": true},
   "normalize_unicode": true,
   "redact_pii": true,

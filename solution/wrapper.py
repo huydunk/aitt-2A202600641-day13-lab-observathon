@@ -84,6 +84,7 @@ def _recompute_total(question: str, trace):
     multiple products / transient tool error) -- in which case we never touch
     the answer."""
     unit_price = None
+    available_qty = None
     pct = 0
     shipping = 0
     disc_called = False
@@ -104,6 +105,8 @@ def _recompute_total(question: str, trace):
                 return None                       # out of stock -> refusal
             if obs.get("found") and obs.get("in_stock") and obs.get("unit_price_vnd") is not None:
                 unit_price = obs.get("unit_price_vnd")
+                if obs.get("quantity") is not None:
+                    available_qty = obs.get("quantity")
         elif tool == "get_discount":
             disc_called = True
             if obs.get("error"):
@@ -123,6 +126,8 @@ def _recompute_total(question: str, trace):
         return None                               # no explicit quantity -> a price inquiry,
                                                   # NOT an order; never fabricate a total
     qty = int(m.group(1))
+    if available_qty is not None and qty > available_qty:
+        return None                               # not enough stock -> refusal, no total
     subtotal = unit_price * qty
     discounted = subtotal * (100 - pct) // 100
     return discounted + shipping
