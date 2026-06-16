@@ -1,0 +1,21 @@
+{
+  "team": "2A202600641",
+  "phase": "public",
+  "headline": 44.84,
+  "sub": {
+    "correct": 0.0,
+    "quality": 0.0,
+    "error": 0.0,
+    "latency": 1.0,
+    "cost": 1.0,
+    "drift": 1.0,
+    "prompt": 0.0
+  },
+  "diag_f1": 0.947,
+  "n": 0,
+  "n_correct": 0,
+  "judge_mode": "offline",
+  "weights_hash": "e81a8ed58d93",
+  "key_hash": "7e3905b75db0",
+  "sig": "12d6689a22eac1b75db30ef071e5dfa111c4ffc25ed37eb5d1d638849505f5dd"
+}
